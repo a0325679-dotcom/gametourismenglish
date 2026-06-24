@@ -1,0 +1,674 @@
+import React, { useState, useEffect } from 'react';
+import { Plane, Home, ArrowRight, ArrowLeft, Lightbulb, Volume2, Megaphone, CheckCircle, XCircle, RotateCcw, AlertTriangle } from 'lucide-react';
+
+// --- 關卡資料定義 ---
+const LEVELS = [
+  {
+    id: 1,
+    titleZh: "哪些東西不能帶上飛機？",
+    titleEn: "What can't we bring on the plane?",
+    instructionZh: "請將下列物品拖曳到正確的分類中！",
+    instructionEn: "Drag the items to the correct box.",
+    hint: "隨身行李的液體單瓶不能超過 100ml；尖銳物品、危險物品通常不能帶上飛機喔！",
+    type: "CLASSIFY",
+    zones: [
+      { id: 'allow', labelZh: '可以帶上飛機', labelEn: 'Can bring on the plane', color: 'border-green-500 bg-green-50 text-green-700', icon: <CheckCircle className="w-6 h-6 text-green-500" /> },
+      { id: 'deny', labelZh: '不可以帶上飛機', labelEn: 'Cannot bring on the plane', color: 'border-red-500 bg-red-50 text-red-700', icon: <XCircle className="w-6 h-6 text-red-500" /> }
+    ],
+    items: [
+      { id: 'water', label: '水 (150ml)', emoji: '💧', correctZone: 'deny' },
+      { id: 'laptop', label: '筆記型電腦', emoji: '💻', correctZone: 'allow' },
+      { id: 'scissors', label: '小剪刀', emoji: '✂️', correctZone: 'deny' },
+      { id: 'toothpaste', label: '牙膏 (90ml)', emoji: '🧴', correctZone: 'allow' },
+      { id: 'powerbank', label: '行動電源', emoji: '🔋', correctZone: 'allow' },
+      { id: 'lighter', label: '噴槍打火機', emoji: '🔥', correctZone: 'deny' },
+      { id: 'perfume', label: '香水 (30ml)', emoji: '🪞', correctZone: 'allow' },
+      { id: 'umbrella', label: '雨傘', emoji: '🌂', correctZone: 'allow' },
+      { id: 'knife', label: '水果刀', emoji: '🔪', correctZone: 'deny' },
+      { id: 'book', label: '書本', emoji: '📖', correctZone: 'allow' },
+      { id: 'flask', label: '空保溫瓶', emoji: '🫙', correctZone: 'allow' },
+      { id: 'swissknife', label: '瑞士刀', emoji: '🛠️', correctZone: 'deny' },
+    ],
+    think: ["為什麼液體不能超過 100ml？", "行動電源為什麼一定要放在隨身行李，不能託運呢？"]
+  },
+  {
+    id: 2,
+    titleZh: "我的登機門在哪裡？",
+    titleEn: "Where is my boarding gate?",
+    instructionZh: "請觀察登機證，並將乘客拖曳到正確的登機門前！",
+    instructionEn: "Observe the boarding pass and drag the passenger to the correct gate.",
+    hint: "仔細看登機證上的「GATE」或「登機門」欄位，還有要注意登機時間喔！",
+    type: "MATCH_SINGLE",
+    ticketInfo: { flight: "CI123", to: "Tokyo", gate: "B4", time: "10:30" },
+    zones: [
+      { id: 'A1', labelZh: '登機門 A1', labelEn: 'Gate A1', color: 'border-blue-300 bg-blue-50 text-blue-700' },
+      { id: 'B2', labelZh: '登機門 B2', labelEn: 'Gate B2', color: 'border-blue-300 bg-blue-50 text-blue-700' },
+      { id: 'B4', labelZh: '登機門 B4', labelEn: 'Gate B4', color: 'border-blue-300 bg-blue-50 text-blue-700' },
+      { id: 'C1', labelZh: '登機門 C1', labelEn: 'Gate C1', color: 'border-blue-300 bg-blue-50 text-blue-700' }
+    ],
+    items: [
+      { id: 'passenger', label: '旅客', emoji: '🚶‍♂️🧳', correctZone: 'B4' }
+    ],
+    think: ["如果登機證上寫 Boarding Time 是 10:30，我應該幾點到登機門呢？", "如果找不到登機門，可以在機場哪裡看資訊？"]
+  },
+  {
+    id: 3,
+    titleZh: "我想坐靠窗！",
+    titleEn: "I want a window seat!",
+    instructionZh: "請根據乘客的需求，點擊適合的空座位！",
+    instructionEn: "Click the suitable empty seat based on the passenger's request.",
+    hint: "飛機座位通常用數字加英文字母表示。A 和 K 通常是靠窗，C 和 H 通常是靠走道。",
+    type: "CLICK_GRID",
+    passengerReq: "我喜歡看風景，請給我一個靠窗的空座位！",
+    seats: [
+      { id: '10A', status: 'empty', type: 'window' }, { id: '10B', status: 'occupied', type: 'middle' }, { id: '10C', status: 'occupied', type: 'aisle' },
+      { id: '10H', status: 'occupied', type: 'aisle' }, { id: '10J', status: 'occupied', type: 'middle' }, { id: '10K', status: 'occupied', type: 'window' },
+      { id: '11A', status: 'occupied', type: 'window' }, { id: '11B', status: 'occupied', type: 'middle' }, { id: '11C', status: 'empty', type: 'aisle' },
+      { id: '11H', status: 'empty', type: 'aisle' }, { id: '11J', status: 'occupied', type: 'middle' }, { id: '11K', status: 'occupied', type: 'window' },
+      { id: '12A', status: 'occupied', type: 'window' }, { id: '12B', status: 'empty', type: 'middle' }, { id: '12C', status: 'occupied', type: 'aisle' },
+      { id: '12H', status: 'occupied', type: 'aisle' }, { id: '12J', status: 'occupied', type: 'middle' }, { id: '12K', status: 'empty', type: 'window' },
+    ],
+    think: ["坐在靠走道的座位有什麼好處？", "緊急出口旁邊的座位，需要具備什麼條件才能坐呢？"]
+  },
+  {
+    id: 4,
+    titleZh: "空服員的任務裝備",
+    titleEn: "What do flight attendants need?",
+    instructionZh: "請將空服員在飛行中會用到的物品拖曳到餐車上！",
+    instructionEn: "Drag the items flight attendants use to the trolley.",
+    hint: "空服員除了送餐，還要照顧乘客安全和處理緊急狀況喔！",
+    type: "CLASSIFY",
+    zones: [
+      { id: 'need', labelZh: '帶上飛機 (餐車)', labelEn: 'Needed (Trolley)', color: 'border-blue-500 bg-blue-50 text-blue-700', icon: <CheckCircle className="w-6 h-6 text-blue-500" /> },
+      { id: 'notneed', labelZh: '不需要帶', labelEn: 'Not needed', color: 'border-gray-400 bg-gray-50 text-gray-700', icon: <XCircle className="w-6 h-6 text-gray-500" /> }
+    ],
+    items: [
+      { id: 'lifevest', label: '救生衣示範', emoji: '🦺', correctZone: 'need' },
+      { id: 'microwave', label: '微波爐', emoji: '📻', correctZone: 'notneed' },
+      { id: 'firstaid', label: '急救箱', emoji: '🩹', correctZone: 'need' },
+      { id: 'list', label: '乘客名單', emoji: '📋', correctZone: 'need' },
+      { id: 'plant', label: '大型盆栽', emoji: '🪴', correctZone: 'notneed' },
+      { id: 'water', label: '水壺/飲料', emoji: '🫖', correctZone: 'need' },
+      { id: 'skates', label: '溜冰鞋', emoji: '🛼', correctZone: 'notneed' },
+      { id: 'flashlight', label: '手電筒', emoji: '🔦', correctZone: 'need' },
+    ],
+    think: ["為什麼空服員在起飛前要示範救生衣和氧氣面罩的用法？", "如果在飛機上覺得不舒服，應該怎麼辦？"]
+  },
+  {
+    id: 5,
+    titleZh: "行李託運大解密",
+    titleEn: "What to do with this luggage?",
+    instructionZh: "請將行李拖曳到「隨身攜帶」或「必須託運」的區域！",
+    instructionEn: "Drag the luggage to 'Carry-on' or 'Checked Baggage'.",
+    hint: "大件行李、大型液體或危險工具一定要託運；貴重物品、電池類一定要隨身攜帶！",
+    type: "CLASSIFY",
+    zones: [
+      { id: 'carry', labelZh: '隨身攜帶', labelEn: 'Carry-on', color: 'border-yellow-500 bg-yellow-50 text-yellow-700', icon: '🎒' },
+      { id: 'checked', labelZh: '必須託運', labelEn: 'Checked Baggage', color: 'border-purple-500 bg-purple-50 text-purple-700', icon: '🧳' }
+    ],
+    items: [
+      { id: 'bigbag', label: '28吋大行李箱', emoji: '🧳', correctZone: 'checked' },
+      { id: 'passport', label: '護照和錢包', emoji: '🛂', correctZone: 'carry' },
+      { id: 'shampoo', label: '洗髮精(500ml)', emoji: '🧴', correctZone: 'checked' },
+      { id: 'laptop', label: '筆記型電腦', emoji: '💻', correctZone: 'carry' },
+      { id: 'battery', label: '相機備用電池', emoji: '🔋', correctZone: 'carry' },
+      { id: 'golf', label: '高爾夫球桿', emoji: '🏌️', correctZone: 'checked' },
+      { id: 'backpack', label: '小背包', emoji: '🎒', correctZone: 'carry' },
+      { id: 'bigknife', label: '大型瑞士刀', emoji: '🛠️', correctZone: 'checked' },
+    ],
+    think: ["為什麼鋰電池絕對不可以放在託運行李中？", "如果託運行李不見了，第一時間該找誰幫忙？"]
+  },
+  {
+    id: 6,
+    titleZh: "看懂機場標誌",
+    titleEn: "Understanding Airport Signs",
+    instructionZh: "請將標誌圖案拖曳到對應的文字說明旁！",
+    instructionEn: "Drag the sign to its matching description.",
+    hint: "機場的標誌設計通常很直觀，看圖案就能猜出大概的意思。",
+    type: "MATCH_MULTIPLE",
+    zones: [
+      { id: 'baggage', labelZh: '行李提領處', labelEn: 'Baggage Claim', color: 'border-gray-300 bg-white text-gray-800' },
+      { id: 'customs', labelZh: '護照查驗/海關', labelEn: 'Customs/Immigration', color: 'border-gray-300 bg-white text-gray-800' },
+      { id: 'currency', labelZh: '外幣兌換', labelEn: 'Currency Exchange', color: 'border-gray-300 bg-white text-gray-800' },
+      { id: 'transfer', labelZh: '轉機', labelEn: 'Transfers', color: 'border-gray-300 bg-white text-gray-800' }
+    ],
+    items: [
+      { id: 'icon_bag', label: '行李圖案', emoji: '🛄', correctZone: 'baggage' },
+      { id: 'icon_cus', label: '查驗圖案', emoji: '🛂', correctZone: 'customs' },
+      { id: 'icon_cur', label: '貨幣圖案', emoji: '💱', correctZone: 'currency' },
+      { id: 'icon_tra', label: '轉機圖案', emoji: '✈️🔃', correctZone: 'transfer' },
+    ],
+    think: ["下飛機後，應該先去拿行李，還是先過護照查驗(入境)？", "如果身上只有台幣，在國外機場想要買水，應該找哪個標誌？"]
+  },
+  {
+    id: 7,
+    titleZh: "飛機構造拼拼樂",
+    titleEn: "Airplane Parts Match",
+    instructionZh: "請將飛機零件的名稱，拖曳到正確的部位框框中！",
+    instructionEn: "Drag the airplane parts to the correct functional area.",
+    hint: "飛機有翅膀(機翼)才能飛，引擎提供動力，尾翼用來控制方向！",
+    type: "MATCH_MULTIPLE",
+    zones: [
+      { id: 'fuselage', labelZh: '裝載乘客與貨物的地方', labelEn: 'Holds passengers & cargo', color: 'border-blue-200 bg-blue-50 text-blue-800' },
+      { id: 'wings', labelZh: '產生升力讓飛機飛起來', labelEn: 'Creates lift to fly', color: 'border-blue-200 bg-blue-50 text-blue-800' },
+      { id: 'engine', labelZh: '提供向前的強大推力', labelEn: 'Provides thrust', color: 'border-blue-200 bg-blue-50 text-blue-800' },
+      { id: 'tail', labelZh: '控制飛機的平衡與方向', labelEn: 'Controls balance & direction', color: 'border-blue-200 bg-blue-50 text-blue-800' }
+    ],
+    items: [
+      { id: 'p_fuse', label: '機身 (Fuselage)', emoji: '💺', correctZone: 'fuselage' },
+      { id: 'p_wing', label: '機翼 (Wings)', emoji: '🦅', correctZone: 'wings' },
+      { id: 'p_eng', label: '引擎 (Engine)', emoji: '⚙️', correctZone: 'engine' },
+      { id: 'p_tail', label: '尾翼 (Tail)', emoji: '🎏', correctZone: 'tail' },
+    ],
+    think: ["你知道飛機的引擎通常裝在哪裡嗎？", "機翼上的小翼片(襟翼)在起飛和降落時有什麼作用？"]
+  },
+  {
+    id: 8,
+    titleZh: "準備降落！天氣判斷",
+    titleEn: "Can we land in this weather?",
+    instructionZh: "請觀察塔台給的天氣報告，點選「可以降落」或「需要重飛/轉降」！",
+    instructionEn: "Observe the weather report and click 'Clear to Land' or 'Go-Around'.",
+    hint: "晴朗的天氣最適合飛行；遇到強烈雷雨或濃霧視線極差時，為了安全通常不能降落。",
+    type: "CLICK_CHOICE",
+    weatherScenarios: [
+      { id: 'sunny', label: '晴天，微風 (Sunny, light wind)', emoji: '☀️', correctAction: 'land' },
+      { id: 'storm', label: '強烈雷暴雨，閃電 (Severe thunderstorm)', emoji: '⛈️', correctAction: 'goaround' },
+      { id: 'fog', label: '濃霧，能見度極低 (Heavy fog, low visibility)', emoji: '🌫️', correctAction: 'goaround' }
+    ],
+    think: ["飛機遇到亂流時，為什麼一定要回到座位繫好安全帶？", "如果因為天氣不好飛機不能降落，最後會飛去哪裡呢？"]
+  }
+];
+
+export default function App() {
+  const [currentLevelIdx, setCurrentLevelIdx] = useState(0);
+  const [placements, setPlacements] = useState({}); // { itemId: zoneId }
+  const [selectedItem, setSelectedItem] = useState(null); // For click-to-move fallback
+  const [feedback, setFeedback] = useState(null); // { message, type: 'success' | 'error' }
+  const [levelComplete, setLevelComplete] = useState(false);
+  const [currentWeatherScenario, setCurrentWeatherScenario] = useState(0);
+
+  const level = LEVELS[currentLevelIdx];
+
+  // Initialize level state
+  useEffect(() => {
+    setPlacements({});
+    setSelectedItem(null);
+    setFeedback(null);
+    setLevelComplete(false);
+    
+    if (level.type === 'CLICK_CHOICE') {
+      setCurrentWeatherScenario(Math.floor(Math.random() * level.weatherScenarios.length));
+    }
+  }, [currentLevelIdx, level]);
+
+  // Check completion for Drag/Match levels
+  useEffect(() => {
+    if (!level.items) return;
+    
+    const allPlaced = level.items.every(item => placements[item.id]);
+    if (allPlaced) {
+      const allCorrect = level.items.every(item => placements[item.id] === item.correctZone);
+      if (allCorrect) {
+        setLevelComplete(true);
+        setFeedback({ message: "太棒了！全部分類正確！", type: 'success' });
+      }
+    }
+  }, [placements, level]);
+
+  const handleDragStart = (e, itemId) => {
+    e.dataTransfer.setData('itemId', itemId);
+    setSelectedItem(itemId);
+  };
+
+  const handleDrop = (e, zoneId) => {
+    e.preventDefault();
+    const itemId = e.dataTransfer.getData('itemId') || selectedItem;
+    if (itemId) {
+      placeItem(itemId, zoneId);
+    }
+  };
+
+  const placeItem = (itemId, zoneId) => {
+    const item = level.items.find(i => i.id === itemId);
+    if (!item) return;
+
+    if (item.correctZone === zoneId) {
+      setPlacements(prev => ({ ...prev, [itemId]: zoneId }));
+      setSelectedItem(null);
+      setFeedback({ message: "正確！", type: 'success' });
+      setTimeout(() => setFeedback(null), 1000);
+    } else {
+      setFeedback({ message: "喔噢，放錯地方囉！再試試看。", type: 'error' });
+      setTimeout(() => setFeedback(null), 1500);
+      setSelectedItem(null);
+    }
+  };
+
+  const handleSeatClick = (seat) => {
+    if (seat.status !== 'empty') return;
+    if (seat.type === 'window') {
+      setLevelComplete(true);
+      setFeedback({ message: "選得好！這是一個靠窗的座位！", type: 'success' });
+    } else {
+      setFeedback({ message: "這不是靠窗的座位喔，再找找看 A 或 K 結尾的座位！", type: 'error' });
+      setTimeout(() => setFeedback(null), 2000);
+    }
+  };
+
+  const handleWeatherChoice = (action) => {
+    const scenario = level.weatherScenarios[currentWeatherScenario];
+    if (scenario.correctAction === action) {
+      setLevelComplete(true);
+      setFeedback({ message: "判斷正確！安全第一！", type: 'success' });
+    } else {
+      setFeedback({ message: "判斷錯誤！這樣可能會發生危險喔！", type: 'error' });
+      setTimeout(() => setFeedback(null), 2000);
+    }
+  };
+
+  const nextLevel = () => {
+    if (currentLevelIdx < LEVELS.length - 1) {
+      setCurrentLevelIdx(prev => prev + 1);
+    }
+  };
+
+  const prevLevel = () => {
+    if (currentLevelIdx > 0) {
+      setCurrentLevelIdx(prev => prev - 1);
+    }
+  };
+
+  const restartQuiz = () => {
+    setCurrentLevelIdx(0);
+  };
+
+  // Renderers for different interaction types
+  const renderClassifyOrMatch = () => {
+    const unplacedItems = level.items.filter(item => !placements[item.id]);
+
+    return (
+      <div className="flex flex-col md:flex-row gap-6 h-full">
+        {/* Drop Zones */}
+        <div className={`flex-1 grid gap-4 ${level.zones.length > 2 ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-2'}`}>
+          {level.zones.map(zone => {
+            const placedHere = level.items.filter(item => placements[item.id] === zone.id);
+            return (
+              <div 
+                key={zone.id}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => handleDrop(e, zone.id)}
+                onClick={() => selectedItem && placeItem(selectedItem, zone.id)}
+                className={`border-4 border-dashed rounded-xl p-4 min-h-[200px] flex flex-col transition-all duration-200 
+                  ${zone.color} ${selectedItem ? 'ring-4 ring-yellow-300 ring-opacity-50 cursor-pointer' : ''}`}
+              >
+                <div className="flex items-center justify-center gap-2 font-bold text-lg mb-2 text-center">
+                  {zone.icon && <span>{zone.icon}</span>}
+                  <div>
+                    <div>{zone.labelZh}</div>
+                    <div className="text-xs opacity-80">{zone.labelEn}</div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 justify-center content-start flex-1 mt-2">
+                  {placedHere.map(item => (
+                    <div key={item.id} className="bg-white px-3 py-2 rounded-lg shadow border border-gray-200 text-sm flex items-center gap-2 animate-bounce-short">
+                      <span className="text-xl">{item.emoji}</span>
+                      <span className="font-medium text-gray-700">{item.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Item List */}
+        <div className="w-full md:w-1/3 bg-blue-50 border-2 border-blue-100 rounded-xl p-4 flex flex-col">
+          <div className="text-center font-bold text-blue-800 mb-4 border-b-2 border-blue-200 pb-2">
+            <div>物品清單</div>
+            <div className="text-sm">Items List</div>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            {unplacedItems.map(item => (
+              <div 
+                key={item.id}
+                draggable
+                onDragStart={(e) => handleDragStart(e, item.id)}
+                onClick={() => setSelectedItem(selectedItem === item.id ? null : item.id)}
+                className={`bg-white p-2 rounded-lg shadow-sm border-2 cursor-grab active:cursor-grabbing flex flex-col items-center justify-center gap-1 hover:shadow-md transition-all
+                  ${selectedItem === item.id ? 'border-yellow-400 bg-yellow-50 scale-105' : 'border-gray-100 hover:border-blue-300'}`}
+              >
+                <span className="text-3xl">{item.emoji}</span>
+                <span className="text-xs font-medium text-center text-gray-700 leading-tight">{item.label}</span>
+              </div>
+            ))}
+            {unplacedItems.length === 0 && (
+              <div className="col-span-full text-center text-gray-500 mt-10">所有物品已分類完成！</div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSeatGrid = () => {
+    return (
+      <div className="flex flex-col items-center justify-center gap-6 h-full p-4">
+        <div className="bg-white p-4 rounded-2xl shadow-lg border-2 border-blue-100 flex items-center gap-4 max-w-md">
+          <div className="text-4xl">🚶‍♂️</div>
+          <div className="text-lg font-bold text-blue-800 relative bg-blue-50 p-3 rounded-xl">
+            {level.passengerReq}
+            <div className="absolute top-1/2 -left-2 w-4 h-4 bg-blue-50 transform -translate-y-1/2 rotate-45"></div>
+          </div>
+        </div>
+        
+        <div className="bg-gray-100 p-6 rounded-3xl shadow-inner border-4 border-gray-300">
+          <div className="flex gap-8 justify-center">
+            {/* Left Side (A, B, C) */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="text-center font-bold text-gray-500 mb-2">A<br/><span className="text-xs">靠窗</span></div>
+              <div className="text-center font-bold text-gray-500 mb-2">B<br/><span className="text-xs">中間</span></div>
+              <div className="text-center font-bold text-gray-500 mb-2">C<br/><span className="text-xs">走道</span></div>
+              
+              {level.seats.filter(s => ['A','B','C'].includes(s.id.charAt(s.id.length-1))).map(seat => (
+                <button
+                  key={seat.id}
+                  onClick={() => handleSeatClick(seat)}
+                  disabled={seat.status === 'occupied' || levelComplete}
+                  className={`w-12 h-14 rounded-t-xl rounded-b-md flex items-center justify-center font-bold text-sm transition-transform
+                    ${seat.status === 'occupied' ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-400 hover:-translate-y-1 cursor-pointer shadow-md'}
+                    ${levelComplete && seat.type === 'window' && seat.status === 'empty' ? 'ring-4 ring-green-400 bg-green-500' : ''}
+                  `}
+                >
+                  {seat.id}
+                </button>
+              ))}
+            </div>
+
+            {/* Aisle */}
+            <div className="w-8 bg-gray-200 rounded-full"></div>
+
+            {/* Right Side (H, J, K) */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="text-center font-bold text-gray-500 mb-2">H<br/><span className="text-xs">走道</span></div>
+              <div className="text-center font-bold text-gray-500 mb-2">J<br/><span className="text-xs">中間</span></div>
+              <div className="text-center font-bold text-gray-500 mb-2">K<br/><span className="text-xs">靠窗</span></div>
+              
+              {level.seats.filter(s => ['H','J','K'].includes(s.id.charAt(s.id.length-1))).map(seat => (
+                <button
+                  key={seat.id}
+                  onClick={() => handleSeatClick(seat)}
+                  disabled={seat.status === 'occupied' || levelComplete}
+                  className={`w-12 h-14 rounded-t-xl rounded-b-md flex items-center justify-center font-bold text-sm transition-transform
+                    ${seat.status === 'occupied' ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-400 hover:-translate-y-1 cursor-pointer shadow-md'}
+                    ${levelComplete && seat.type === 'window' && seat.status === 'empty' ? 'ring-4 ring-green-400 bg-green-500' : ''}
+                  `}
+                >
+                  {seat.id}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderWeatherChoice = () => {
+    const scenario = level.weatherScenarios[currentWeatherScenario];
+    return (
+      <div className="flex flex-col items-center justify-center gap-10 h-full p-4">
+        <div className="bg-white border-4 border-blue-200 p-8 rounded-3xl shadow-xl flex flex-col items-center max-w-lg w-full text-center relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full bg-blue-800 text-white text-sm font-bold py-1">TOWER CONTROL</div>
+          <div className="text-8xl mt-6 mb-4">{scenario.emoji}</div>
+          <h3 className="text-2xl font-bold text-gray-800 mb-2">{scenario.label}</h3>
+          <p className="text-gray-500">請指示飛行員下一步行動：</p>
+        </div>
+
+        <div className="flex gap-6 w-full max-w-lg">
+          <button 
+            onClick={() => handleWeatherChoice('land')}
+            disabled={levelComplete}
+            className="flex-1 bg-green-500 hover:bg-green-400 text-white text-xl font-bold py-6 px-4 rounded-2xl shadow-lg border-b-4 border-green-700 active:border-b-0 active:translate-y-1 transition-all disabled:opacity-50"
+          >
+            可以降落<br/><span className="text-sm font-normal">Clear to Land</span>
+          </button>
+          <button 
+            onClick={() => handleWeatherChoice('goaround')}
+            disabled={levelComplete}
+            className="flex-1 bg-red-500 hover:bg-red-400 text-white text-xl font-bold py-6 px-4 rounded-2xl shadow-lg border-b-4 border-red-700 active:border-b-0 active:translate-y-1 transition-all disabled:opacity-50"
+          >
+            重飛/轉降<br/><span className="text-sm font-normal">Go-Around/Divert</span>
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderGateMatch = () => {
+    // Custom render for Level 2
+    return (
+      <div className="flex flex-col md:flex-row gap-6 h-full items-center p-4">
+        {/* Boarding Pass */}
+        <div className="flex-1 bg-white p-6 rounded-xl shadow-xl border-2 border-gray-200 w-full max-w-md transform -rotate-2">
+          <div className="border-b-2 border-dashed border-gray-300 pb-4 mb-4">
+            <h3 className="text-2xl font-black text-blue-900 tracking-wider">BOARDING PASS</h3>
+            <p className="text-gray-500 text-sm">AIRPORT SECURITY QUIZ AIRLINES</p>
+          </div>
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div>
+              <p className="text-xs text-gray-400 uppercase">Flight</p>
+              <p className="text-xl font-bold">{level.ticketInfo.flight}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 uppercase">To</p>
+              <p className="text-xl font-bold">{level.ticketInfo.to}</p>
+            </div>
+            <div className="bg-yellow-100 p-2 rounded border border-yellow-300 shadow-inner">
+              <p className="text-xs text-yellow-700 uppercase font-bold">Gate</p>
+              <p className="text-3xl font-black text-blue-800">{level.ticketInfo.gate}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 uppercase">Boarding Time</p>
+              <p className="text-xl font-bold text-red-600">{level.ticketInfo.time}</p>
+            </div>
+          </div>
+          <div className="flex justify-center mt-4 border-t pt-4">
+             {/* The draggable passenger */}
+             {!placements['passenger'] && (
+               <div 
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, 'passenger')}
+                  onClick={() => setSelectedItem('passenger')}
+                  className={`bg-blue-100 p-4 rounded-full cursor-grab active:cursor-grabbing hover:bg-blue-200 transition-colors shadow-md border-2 ${selectedItem === 'passenger' ? 'border-yellow-500 scale-110' : 'border-blue-300'}`}
+                >
+                  <span className="text-5xl">🚶‍♂️🧳</span>
+                  <p className="text-center text-xs font-bold mt-1 text-blue-800">拖曳我</p>
+               </div>
+             )}
+          </div>
+        </div>
+
+        {/* Gates */}
+        <div className="flex-1 grid grid-cols-2 gap-4 w-full">
+          {level.zones.map(zone => (
+            <div 
+              key={zone.id}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => handleDrop(e, zone.id)}
+              onClick={() => selectedItem && placeItem(selectedItem, zone.id)}
+              className={`h-40 rounded-xl border-4 flex flex-col items-center justify-center gap-2 transition-all
+                ${zone.color} ${selectedItem ? 'ring-4 ring-yellow-300 ring-opacity-50 cursor-pointer' : ''}
+                ${placements['passenger'] === zone.id ? 'bg-green-100 border-green-500' : 'border-dashed'}
+              `}
+            >
+              <div className="bg-gray-800 text-yellow-400 font-mono text-3xl font-bold px-4 py-1 rounded shadow-inner">
+                {zone.id}
+              </div>
+              <div className="text-sm font-bold text-gray-600">{zone.labelZh}</div>
+              {placements['passenger'] === zone.id && (
+                <div className="text-4xl animate-bounce">🚶‍♂️🧳</div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderContent = () => {
+    switch (level.type) {
+      case 'CLASSIFY':
+      case 'MATCH_MULTIPLE':
+        return renderClassifyOrMatch();
+      case 'CLICK_GRID':
+        return renderSeatGrid();
+      case 'CLICK_CHOICE':
+        return renderWeatherChoice();
+      case 'MATCH_SINGLE':
+        return renderGateMatch();
+      default:
+        return <div>未知的關卡類型</div>;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#e8f4f8] font-sans text-gray-800 select-none flex flex-col items-center py-4 px-2 sm:px-6">
+      
+      {/* Main Container */}
+      <div className="w-full max-w-6xl bg-white rounded-3xl shadow-2xl overflow-hidden border-4 border-white flex flex-col h-[90vh] min-h-[700px]">
+        
+        {/* Header Region */}
+        <div className="p-4 md:p-6 pb-2">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            {/* Title Block */}
+            <div className="flex items-center gap-4">
+              <div className="bg-blue-600 text-white p-3 md:p-4 rounded-full shadow-lg">
+                <Plane className="w-8 h-8 md:w-10 md:h-10 transform -rotate-45" />
+              </div>
+              <div>
+                <h1 className="text-2xl md:text-3xl font-black text-gray-800 tracking-wide">{level.titleZh}</h1>
+                <h2 className="text-lg md:text-xl font-bold text-blue-600">{level.titleEn}</h2>
+              </div>
+            </div>
+
+            {/* Controls (Home) */}
+            <button onClick={restartQuiz} className="bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-xl shadow-md transition-colors flex items-center gap-2">
+              <Home className="w-6 h-6" />
+              <span className="hidden md:inline font-bold">目錄</span>
+            </button>
+          </div>
+
+          <div className="mt-6 flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4">
+            {/* Instruction */}
+            <div className="flex items-center gap-2 text-gray-700 font-medium">
+              <div className="bg-blue-100 p-2 rounded-full">
+                <Volume2 className="w-5 h-5 text-blue-600" />
+              </div>
+              <p className="text-sm md:text-base">
+                <span className="font-bold text-red-600">{level.instructionZh.split('拖曳')[0]}</span>
+                {level.instructionZh.includes('拖曳') ? <span className="font-bold text-red-600">拖曳/點擊</span> : ''}
+                <span className="font-bold text-red-600">{level.instructionZh.split('拖曳')[1] || level.instructionZh}</span>
+                <span className="ml-2 text-gray-500 font-normal">{level.instructionEn}</span>
+              </p>
+            </div>
+
+            {/* Hint Box */}
+            <div className="bg-[#fff8d6] border-2 border-[#ffe66d] rounded-xl p-3 flex gap-3 max-w-md shadow-sm">
+              <Lightbulb className="w-6 h-6 text-yellow-600 shrink-0" />
+              <div>
+                <div className="font-bold text-yellow-800 text-sm mb-1">小提示</div>
+                <div className="text-sm text-yellow-900 leading-snug">{level.hint}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Feedback Banner (Absolute positioning over the interactive area) */}
+        <div className="relative flex-1 bg-white">
+          {feedback && (
+            <div className={`absolute top-4 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 animate-bounce font-bold text-lg
+              ${feedback.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
+              {feedback.type === 'success' ? <CheckCircle /> : <AlertTriangle />}
+              {feedback.message}
+            </div>
+          )}
+
+          {/* Interactive Content Area */}
+          <div className="absolute inset-0 p-4 md:p-6 overflow-y-auto overflow-x-hidden custom-scrollbar">
+            {renderContent()}
+          </div>
+        </div>
+
+        {/* Footer / Think Region */}
+        <div className="border-t-2 border-gray-100 p-4 md:p-6 bg-gray-50 flex flex-col md:flex-row items-center justify-between gap-4">
+          
+          {/* Think Box */}
+          <div className="bg-white border-2 border-blue-100 rounded-xl p-4 flex gap-4 w-full md:w-auto md:flex-1 shadow-sm relative overflow-hidden">
+             {/* Character Image Placeholder (Using emoji for now) */}
+             <div className="text-6xl self-end z-10">👩‍✈️</div>
+             <div className="z-10 flex-1">
+               <div className="flex items-center gap-2 font-bold text-blue-700 mb-2">
+                 <Megaphone className="w-5 h-5" />
+                 想一想
+               </div>
+               <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
+                 {level.think.map((q, i) => <li key={i}>{q}</li>)}
+               </ul>
+             </div>
+             {/* Chat bubble tail effect */}
+             <div className="absolute -left-4 bottom-4 w-10 h-10 bg-white border-b-2 border-l-2 border-blue-100 transform rotate-45 z-0"></div>
+          </div>
+
+          {/* Navigation Controls */}
+          <div className="flex items-center gap-6 bg-white p-3 rounded-full shadow border border-gray-200">
+            <button 
+              onClick={prevLevel} 
+              disabled={currentLevelIdx === 0}
+              className="p-2 rounded-full text-blue-600 hover:bg-blue-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+            >
+              <ArrowLeft className="w-6 h-6" />
+            </button>
+            
+            <div className="font-bold text-gray-600 text-lg flex gap-1">
+              {LEVELS.map((_, idx) => (
+                <span key={idx} className={`w-3 h-3 rounded-full inline-block ${idx === currentLevelIdx ? 'bg-blue-600 scale-125' : 'bg-gray-300'}`}></span>
+              ))}
+            </div>
+
+            <button 
+              onClick={nextLevel}
+              disabled={currentLevelIdx === LEVELS.length - 1 || !levelComplete}
+              className={`p-2 rounded-full flex items-center gap-2 transition-all font-bold px-4
+                ${levelComplete && currentLevelIdx < LEVELS.length - 1 ? 'bg-green-500 text-white hover:bg-green-600 shadow-md animate-pulse' : 'text-blue-600 hover:bg-blue-100 disabled:opacity-30 disabled:hover:bg-transparent'}
+              `}
+            >
+              {levelComplete && currentLevelIdx < LEVELS.length - 1 ? '下一關' : ''}
+              <ArrowRight className="w-6 h-6" />
+            </button>
+          </div>
+
+          <button 
+             onClick={() => { setPlacements({}); setLevelComplete(false); }} 
+             className="text-gray-500 hover:text-blue-600 flex items-center gap-1 font-bold text-sm bg-white p-3 rounded-xl border border-gray-200 shadow-sm transition-colors"
+          >
+            <RotateCcw className="w-4 h-4" />重新開始
+          </button>
+        </div>
+
+      </div>
+
+      {/* Basic CSS for animations and scrollbar injected safely */}
+      <style dangerouslySetInnerHTML={{__html: `
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        @keyframes bounce-short {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-10%); }
+        }
+        .animate-bounce-short { animation: bounce-short 0.5s ease-in-out; }
+      `}} />
+    </div>
+  );
+}
